@@ -60,16 +60,44 @@ ht <- head(pdxTrees$Tree_Height, n = 15)
 
 a. What are the classes of `dats`, `pdxTreesSmall` and `ht`?
 
+Dats: List
+pdxTreesSmall: Dataframe
+ht: Vector (of numerics)
+
 b. Find the 10th, 11th, and 12th values of `ht`.
+
+112, 112, 48
 
 c. Provide the `Species` column of `pdxTrees` as a data frame with one column.
 
+I'm not sure whether I'm supposed to provide the whole column (including repeats), or whether I should get it and filter for uniqueness. From my understanding, I understood it as including repeats, but I want to make my intention clear for grading. I have also made this eval = F, due to how large this dataset is.
+```{r, eval = F}
+data.frame(pdxTrees$Species)
+```
+
+
 d. Provide the `Species` column of `pdxTrees` as a character vector.
+
+I'm not sure whether I'm supposed to provide the whole column (including repeats), or whether I should get it and filter for uniqueness. From my understanding, I understood it as including repeats, but I want to make my intention clear for grading. I have also made this eval = F, due to how large this dataset is.
+```{r, eval = F}
+as.vector(pdxTrees$Species)
+```
+
 
 e. Provide code that gives us the second entry in `sets` from `dats`.
 
+```{r}
+dats$sets[2]
+```
+
+
 f. Subset `pdxTreesSmall` to only `Douglas-fir` and then provide the `DBH` and `Condition` of the 4th `Douglas-fir` in the dataset.  (Feel free to mix in some `tidyverse` code if you would like to.)
 
+
+```{r}
+douglasfir <- pdxTreesSmall %>% filter(Common_Name == "Douglas-Fir") %>% select(DBH, Condition)
+douglasfir[4,]
+```
 
 
 
@@ -95,7 +123,22 @@ thing5 <- thing2 - thing4*thing3
 thing6 <- thing2 + thing4*thing3
 ```
 
+```{r}
+get_ci <- function(input, p = .975) {
+  if (p > 1 | p < 0) {
+    stop("Your confidence interval is not between 0 and 1.")
+  }
+  length <- length(input)
+  mean <- mean(input)
+  sd <- sd(input)/sqrt(length)
+  moe <- qt(p = p, df = thing1 - 1)
+  lower_ci <- mean - moe*sd
+  upper_ci <- mean + moe*sd
+  return(c(lower_ci, upper_ci))
+}
 
+get_ci(pdxTrees$DBH, 0.975)
+```
 
 
 
@@ -112,14 +155,31 @@ ggplot(data = pdxTrees, mapping = aes(x = DBH)) +
   geom_histogram()
 
 # Shorthand histogram function
-histo <- function(data, x){
+histo <- function(data, x, bins, fill, color){
    x <- enquo(x)
   ggplot(data = data, mapping = aes(x = !!x)) +
-    geom_histogram()
+    geom_histogram(bins = bins, fill = as.character(fill), color = as.character(color))
 }
 
+scatter <- function(data, x, y, color_var, alpha) {
+    x <- enquo(x)
+    y <- enquo(y)
+    color_var <- enquo(color_var)
+    ggplot(data = data, mapping = aes(x = !!x, y = !!y, color = !!color_var)) +
+      geom_point(alpha = alpha)
+}
+
+boxplot <- function(data, x, y, fill_var) {
+    x <- enquo(x)
+    y <- enquo(y)
+    fill_var <- enquo(fill_var)
+    ggplot(data = data, mapping = aes(x = !!x, y = !!y, fill = !!fill_var)) +
+      geom_boxplot()
+}
 # Test it
-histo(pdxTrees, DBH)
+histo(pdxTrees, DBH, 30, "red", "blue")
+scatter(pdxTreesSmall, DBH, Tree_Height, Species, 0.5)
+boxplot(pdxTrees, DBH, Tree_Height, Functional_Type)
 ```
 
 a. Edit `histo()` so that the user can set 
@@ -151,19 +211,62 @@ pdxTrees %>%
   ungroup()
 ```
 
+```{r}
+condition_prop <- function(data, input, condition) {
+  input <- enquo(input)
+  condition <- enquo(condition)
+  data %>%
+  count(!!input, !!condition) %>%
+  group_by(!!input) %>%
+  mutate(prop = n/sum(n)) %>%
+  ungroup()
+}
+
+condition_prop(pdxTrees, Native, Condition)
+```
+
+
 
 b.  Write a function to compute the mean, median, sd, min, max, sample size, and number of missing values of a quantitative variable by the categories of another variable.  Make sure the output is a data frame (or tibble).  Don't forget to test your function.
+
+```{r}
+get_stats <- function(data, quant_var, category) {
+  quant_var <- enquo(quant_var)
+  category <- enquo(category)
+  df <- data %>% 
+    group_by(!!category) %>% 
+    summarize(mean = mean(!!quant_var, na.rm = T), 
+              median = median(!!quant_var, na.rm = T), 
+              sd = sd(!!quant_var, na.rm = T), 
+              min = min(!!quant_var, na.rm = T), 
+              max = max(!!quant_var, na.rm = T), 
+              count = count(!!category), 
+              na_count = sum(is.na(!!quant_var)))
+  print(df)
+}
+
+get_stats(pdxTrees, DBH, Common_Name)
+```
 
 
 ### Problem 5: another `babynames` exercise
 
 Write a function called grab_name that, when given a **name** ***and a year*** as an argument, returns the rows from the `babynames` data frame in the `babynames` package that match that name for that year (and returns an error if that name and year combination does not match any rows). Run the function once with the arguments **Ezekiel and 1883** and once with **Ezekiel and 1983**.
 
-```{r, eval=FALSE}
+```{r, eval=TRUE}
 #' Make sure to switch eval = FALSE to eval = TRUE before knitting!!
 
-grab_name <- function(myname, myyear) {
+grab_name <- function(myname, myyear){
   # Code your function here
+  myname <- enquo(myname)
+  myyear <- enquo(myyear)
+  temp_data <- filter(babynames, name == !!myname, year == !!myyear)
+  if (nrow(temp_data) < 1) 
+    {stop("At the year ", quo_name(myyear), ", there are no matches for the name: ", quo_name(myname))} 
+  else 
+    {return(temp_data)}
 }
+
+grab_name("Ezekiel", 1983)
 
 ```
