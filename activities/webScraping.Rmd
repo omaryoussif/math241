@@ -12,6 +12,8 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```{r}
 #Load web scraping library
 library(rvest)
+library(ggplot2)
+library(readr)
 ```
 
 # Grab Tables from the Web
@@ -64,9 +66,18 @@ college_access_table2 <- url %>%
   html_node(css = "#opinion-pell-table > div > div.g-item.g-sortable-table > table") %>%
   html_table()
 
+college_access_table$`Net price, mid. income` <- parse_number(college_access_table$`Net price, mid. income`) * 1000
 
 ```
 
 ## Create a visualization
 
 Choose 3 variables and create a heuristic visualization using this dataset.
+
+```{r}
+
+ggplot(data = college_access_table, mapping = aes(x = `Net price, mid. income`, y = `College Access Index`, fill = `Pell grad share`)) +
+  geom_point()
+```
+
+

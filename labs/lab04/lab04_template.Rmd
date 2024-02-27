@@ -17,6 +17,137 @@ library(tidyverse)
 ```
 
 ### Problem 1: COVID survey - interpretation
+ 
+This graph seems to include a lot of data from a COVID survey, faceted across many different identities and separated by question responses. The way it is structured allows us to see some interesting situations where some specific explanatory variables (demographics) respond a specific way to some questions.
 
+We can see a trend in regards to age, where the sub 20 group is often significantly different. We also notice specifically that there is not much of a difference between 21-25 and 26-30 groups. A specific example that was intuitive was that older demographics are more hesitant and less trusting than younger people. This might be intuitive due to lived experience and how recent it was. It's interesting how the 21-25 group thought the vaccine is unsafe, but would recommend it to family and friends and others as I would have not guessed that.
+
+It's also pretty interesting how people who had the COVID vaccine and the flu vaccine had similar responses to the questions, which tells me that there is possibly some relationship between these thoughts. I remember people being worried about this specific COVID vaccine as people thought it was accelerated, which made it "unsafe" and it's interesting seeing that logic doesn't apply much according to this data.
+
+Another thing I noticed was the lack of differences between some of the races listed, but not all of them. I wonder why people who marked down White, Black, and Asian had no drastic differences across all 6 questions, but if we compare it to Native Hawaiian or Pacific Islander or American Indian / Alaskan Native, we see a drastic change.
+
+I also did not expect people under nursing to choose strongly disagree for the safety of the vaccine, but also expected that medicine would be the same or at most higher by one mark.
 
 ### Problem 2: COVID survey - reconstruct
+
+```{r}
+covid_survey <- read_csv("data/covid-survey.csv", skip = 1)
+dim(covid_survey)
+```
+
+```{r}
+covid_survey<-covid_survey%>%filter(if_any(-response_id, ~ !is.na(.)))
+dim(covid_survey)
+```
+
+```{r}
+covid_survey$exp_already_vax <- case_when(
+  covid_survey$exp_already_vax == 0 ~ "No",
+  covid_survey$exp_already_vax == 1 ~ "Yes"
+)
+
+covid_survey$exp_flu_vax <- case_when(
+  covid_survey$exp_flu_vax == 0 ~ "No",
+  covid_survey$exp_flu_vax == 1 ~ "Yes"
+)
+
+covid_survey$exp_profession <- case_when(
+  covid_survey$exp_profession == 0 ~ "Medical",
+  covid_survey$exp_profession == 1 ~ "Nursing"
+)
+
+covid_survey$exp_gender <- case_when(
+  covid_survey$exp_gender == 0 ~ "Male",
+  covid_survey$exp_gender == 1 ~ "Female",
+  covid_survey$exp_gender == 3 ~ "Non-binary third gender",
+  covid_survey$exp_gender == 4 ~ "Prefer not to say"
+)
+
+covid_survey$exp_race <- case_when(
+  covid_survey$exp_race == 1 ~ "American Indian / Alaskan Native",
+  covid_survey$exp_race == 2 ~ "Asian",
+  covid_survey$exp_race == 3 ~ "Black / African American",
+  covid_survey$exp_race == 4 ~ "Native Hawaiian / Other Pacific Islander",
+  covid_survey$exp_race == 5 ~ "White"
+)
+
+covid_survey$exp_ethnicity <- case_when(
+  covid_survey$exp_ethnicity == 1 ~ "Hispanic / Latino",
+  covid_survey$exp_ethnicity == 2 ~ "Non-Hispanic/Non-Latino"
+)
+
+covid_survey$exp_age_bin <- case_when(
+  covid_survey$exp_age_bin == 0 ~ "<20",
+  covid_survey$exp_age_bin == 20 ~ "21-25",
+  covid_survey$exp_age_bin == 25 ~ "26-30",
+  covid_survey$exp_age_bin == 30 ~ ">30",
+)
+```
+
+In this section, the first pivot longer aims to convert the wide structure of the data to a long one that's mostly row based. It gets all the explanatory variables (the ones that start with exp_) and places them as rows with their value as a new column. In the middle, filter removes any NA values. The second one does something similar but with response variables, where it gathers them all and assigns them response values.
+
+```{r}
+covid_survey_longer <- covid_survey %>% 
+  pivot_longer(
+    cols = starts_with("exp_"), 
+    names_to = "explanatory", 
+    values_to = "explanatory_value") %>% 
+  filter(!is.na(explanatory_value)) %>% 
+  pivot_longer(
+    cols = starts_with("resp_"), 
+    names_to = "response", 
+    values_to = "response_value")
+
+covid_survey_longer
+```
+
+```{r}
+covid_survey_summary_stats_by_group <- covid_survey_longer %>% group_by(explanatory, explanatory_value, response) %>% summarize(mean = mean(response_value, na.rm = TRUE), low = quantile(response_value, 0.1, na.rm = TRUE), high = quantile(response_value, 0.9, na.rm = TRUE))
+
+covid_survey_summary_stats_by_group
+```
+
+```{r}
+covid_survey_summary_stats_all <- covid_survey_longer %>% group_by(response) %>% summarize(mean = mean(response_value, na.rm = TRUE), low = quantile(response_value, 0.1, na.rm = TRUE), high = quantile(response_value, 0.9, na.rm = TRUE)) %>% mutate(explanatory = "All", explanatory_value = "")
+
+covid_survey_summary_stats_all
+```
+
+```{r}
+covid_survey_summary_stats <- bind_rows(covid_survey_summary_stats_all, covid_survey_summary_stats_by_group)
+covid_survey_summary_stats
+```
+
+```{r}
+covid_survey_summary_stats$response[covid_survey_summary_stats$response == "resp_safety"] <- "Based on my understanding, I believe the vaccine is safe"
+covid_survey_summary_stats$response[covid_survey_summary_stats$response == "resp_confidence_science"] <- "I am confident in the scientific vetting process for the new COVID vaccines"
+covid_survey_summary_stats$response[covid_survey_summary_stats$response == "resp_feel_safe_at_work"] <- "Getting the vaccine will make me feel safer at work"
+covid_survey_summary_stats$response[covid_survey_summary_stats$response == "resp_will_recommend"] <- "I will recommend the vaccine to family, friends, and community members"
+covid_survey_summary_stats$response[covid_survey_summary_stats$response == "resp_trust_info"] <- "I trust the information that I have received about the vaccines"
+covid_survey_summary_stats$response[covid_survey_summary_stats$response == "resp_concern_safety"] <- "I am concerned about the safety and side effects of the vaccine"
+
+covid_survey_summary_stats$explanatory[covid_survey_summary_stats$explanatory == "exp_age_bin"] <- "Age"
+covid_survey_summary_stats$explanatory[covid_survey_summary_stats$explanatory == "exp_gender"] <- "Gender"
+covid_survey_summary_stats$explanatory[covid_survey_summary_stats$explanatory == "exp_race"] <- "Race"
+covid_survey_summary_stats$explanatory[covid_survey_summary_stats$explanatory == "exp_ethnicity"] <- "Ethnicity"
+covid_survey_summary_stats$explanatory[covid_survey_summary_stats$explanatory == "exp_profession"] <- "Profession"
+covid_survey_summary_stats$explanatory[covid_survey_summary_stats$explanatory == "exp_already_vax"] <- "Had COVID Vaccine"
+covid_survey_summary_stats$explanatory[covid_survey_summary_stats$explanatory == "exp_flu_vax"] <- "Had flu vaccine this year"
+```
+
+
+```{r fig.height=10, fig.width=10}
+ggplot(data = covid_survey_summary_stats, mapping = aes(mean, explanatory_value, xmin = low, xmax = high)) +
+  geom_errorbarh(height = 0.1) +
+  geom_point() +
+  facet_grid(vars(factor(explanatory, levels = c("All", "Age", "Gender", "Race", "Ethnicity", "Profession", "Had COVID Vaccine", "Had flu vaccine this year"))), vars(response), scales = "free_y", labeller = labeller(response = label_wrap_gen(15))) +
+  theme_minimal() + 
+  theme(strip.background = element_rect(colour="black",
+                                        fill="gray90"),
+        axis.title.y=element_blank(),
+        strip.text.y = element_text(angle = 0),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  labs(x = "Mean Likert score\n(Error bars range from 10th to 90th percentile)")
+```
+
