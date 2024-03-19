@@ -33,7 +33,7 @@ library(RColorBrewer)
 
 ```{r, eval = F}
 # Load in your Census API key (replace YOUR_API_KEY with your actual key)
-census_api_key("YOUR_API_KEY", install = TRUE)
+#census_api_key("YOUR_API_KEY", install = TRUE)
 ```
 
 ## Retrieving Spatial Data for Multnomah County, OR
@@ -367,5 +367,28 @@ Make sure to bring in spatial data by using geometry = TRUE. Also make sure to c
 5. Create a static presentation-ready map of the variable you selected.
 
 6. Based on a visual comparison of the maps you created in (3) and (5), summarize in your own words the association between racial/ethnic composition and your variable of interest.
+
+
+```{r}
+clackamas_tracts <- get_acs(geography = "tract",
+                     year = 2022,
+                     variables = c(medincome = "B19013_001",
+                                   fb = "B05012_003",
+                                   totp = "B05012_001"),
+                     state = "OR",
+                     county = "Clackamas",
+                     survey = "acs5",
+                     output = "wide",
+                     geometry = TRUE)
+
+clackamas_tracts <- clackamas_tracts %>%
+  select(-ends_with("M")) %>%
+  rename(medincome = medincomeE, fb = fbE, totp = totpE) %>%
+  mutate(pfb = 100 * (fb / totp))
+
+# View the first few rows of the data
+head(clackamas_tracts)
+```
+
 
 

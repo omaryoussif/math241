@@ -10,8 +10,6 @@ urlcolor: blue
 ```{r setup, include=FALSE}
 # Do not modify this chunk.
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
-
-
 ```
 
 ```{r}
@@ -20,6 +18,10 @@ library(tidyverse)
 library(rnoaa)
 library(rvest)
 library(httr)
+library(lubridate)
+library(spotifyr)
+library(ggjoy)
+library(rvest)
 ```
 
 
@@ -49,49 +51,108 @@ library(rnoaa)
 
 a. First things first, go to [this NOAA website](https://www.ncdc.noaa.gov/cdo-web/token) to get a key emailed to you.  Then insert your key below:
 
-```{r, eval = FALSE}
-options(noaakey = "INSERT KEY")
+```{r, eval = T, echo = F}
+options(noaakey = "KBhdXzDniCZXmgXWBsLhUdzxmxrXYvFp")
 ```
 
 
 
 b. From the National Climate Data Center (NCDC) data, use the following code to grab the stations in Multnomah County. How many stations are in Multnomah County?
 
-```{r, eval = FALSE}
+```{r}
 stations <- ncdc_stations(datasetid = "GHCND", 
                           locationid = "FIPS:41051")
 
 mult_stations <- stations$data
 ```
 
+We have 25 stations in Multnomah County.
 
 
 c. January was not so rainy this year, was it?  Let's grab the precipitation data for site `GHCND:US1ORMT0006` for this past January.
 
-```{r, eval = FALSE}
+```{r}
 # First fill-in and run to following to determine the
 # datatypeid
 ncdc_datatypes(datasetid = "GHCND",
-               stationid = "")
+               stationid = "GHCND:US1ORMT0006")
 
 # Now grab the data using ncdc()
-precip_se_pdx <- ncdc()
+precip_se_pdx <- ncdc(datasetid = "GHCND", stationid = "GHCND:US1ORMT0006", datatypeid = "PRCP", startdate = "2024-01-01", enddate = "2024-01-31")
+data.frame(precip_se_pdx[2])
 ```
 
 d.  What is the class of `precip_se_dpx`?  Grab the data frame nested in `precip_se_dpx` and call it `precip_se_dpx_data`.
 
+The class of it is ncdc_data (which is a list of multiple (2) things).
+
+```{r, echo = F}
+precip_se_dpx_data <- data.frame(precip_se_pdx[2])
+```
 
 
 e. Use `ymd_hms()` in the package `lubridate` to wrangle the date column into the correct format.
 
+```{r}
+precip_se_dpx_data$data.date <- ymd_hms(precip_se_dpx_data$data.date)
+```
 
 
 f. Plot the precipitation data for this site in Portland over time.  Rumor has it that we had only one day where it didn't rain.  Is that true?
 
+```{r}
+ggplot(data = precip_se_dpx_data, mapping = aes(x = data.date, y = data.value)) +
+  geom_point() +
+  geom_line(mode = "lm", color = "blue") +
+  labs(x = "Days in January 2024",
+       y = "Precipitation (mm)",
+       title = "Precipitation in Portland, Oregon on January 2024",
+       subtitle = "Data sourced from the National Oceanic and Atmospheric Administration")
+```
+
+
 
 g. (Bonus) Adapt the code to create a visualization that compares the precipitation data for January over the the last four years.  Do you notice any trend over time?
 
+```{r}
+precip_se_pdx2023 <- data.frame(ncdc(datasetid = "GHCND", stationid = "GHCND:US1ORMT0006", datatypeid = "PRCP", startdate = "2023-01-01", enddate = "2023-01-31")[2])
+precip_se_pdx2022 <- data.frame(ncdc(datasetid = "GHCND", stationid = "GHCND:US1ORMT0006", datatypeid = "PRCP", startdate = "2022-01-01", enddate = "2022-01-31")[2])
+precip_se_pdx2021 <- data.frame(ncdc(datasetid = "GHCND", stationid = "GHCND:US1ORMT0006", datatypeid = "PRCP", startdate = "2021-01-01", enddate = "2021-01-31")[2])
+```
 
+```{r}
+precip_se_pdx2023$data.date <- ymd_hms(precip_se_pdx2023$data.date)
+precip_se_pdx2022$data.date <- ymd_hms(precip_se_pdx2022$data.date)
+precip_se_pdx2021$data.date <- ymd_hms(precip_se_pdx2021$data.date)
+
+precip_se_pdx2024 <- precip_se_dpx_data
+
+precip_se_pdx2024$data.date <- day(precip_se_pdx2024$data.date)
+precip_se_pdx2023$data.date <- day(precip_se_pdx2023$data.date)
+precip_se_pdx2022$data.date <- day(precip_se_pdx2022$data.date)
+precip_se_pdx2021$data.date <- day(precip_se_pdx2021$data.date)
+
+precip_se_pdx2024$year <- "2024"
+precip_se_pdx2023$year <- "2023"
+precip_se_pdx2022$year <- "2022"
+precip_se_pdx2021$year <- "2021"
+```
+
+
+```{r}
+ggplot(data = precip_se_pdx2024, mapping = aes(x = data.date, y = data.value, color = year)) +
+  geom_line() +
+  geom_line(data = precip_se_pdx2023) +
+  geom_line(data = precip_se_pdx2022) +
+  geom_line(data = precip_se_pdx2021) +
+  labs(x = "Days in January 2021-2024",
+       y = "Precipitation (mm)",
+       title = "Precipitation in Portland, Oregon on January 2021-2024",
+       subtitle = "Data sourced from the National Oceanic and Atmospheric Administration",
+       color = "Lines")
+```
+
+We can see that outliers have generally decreased, but also a high level of variance from year to year. In terms of average precipitation, it's a little hard to discern a trend from this data.
 
 
 ## Problem 2: From API to R 
@@ -108,6 +169,53 @@ Here are some potential API wrapper packages.  Feel free to use one not included
 * [`rfishbase`](https://github.com/ropensci/rfishbase): For the fish lovers
 * [`darksky`](https://github.com/hrbrmstr/darksky): For global historical and current weather conditions
 
+```{r, echo = F, include=FALSE}
+Sys.setenv(SPOTIFY_CLIENT_ID = '4c6705d470d64df285bdefd05b264278')
+Sys.setenv(SPOTIFY_CLIENT_SECRET = '2a1f6f7b24404e5e9d983080070320f9')
+
+access_token <- get_spotify_access_token()
+get_spotify_access_token()
+```
+
+This is hidden for my own privacy reasons, but above is code using the spotifyr API wrapped and setting up keys and so.
+
+```{r}
+sza_valence <- get_artist_audio_features('sza') %>% 
+    arrange(-valence) %>% 
+    select(track_name, valence, album_name) %>%
+    filter(album_name != "Dear Evan Hansen (Original Motion Picture Soundtrack)" & 
+           album_name != "Black Panther The Album Music From And Inspired By" & 
+           album_name != "Ctrl (Deluxe)")
+```
+
+```{r}
+olivia_valence <- get_artist_audio_features('olivia rodrigo') %>% 
+    arrange(-valence) %>% 
+    select(track_name, valence, album_name) %>%
+    filter(album_name != "The Hunger Games: The Ballad of Songbirds & Snakes (Music From & Inspired By)")
+```
+
+```{r}
+ggplot(olivia_valence, aes(x= valence, y = album_name, fill = album_name)) +
+  geom_joy() +
+  theme_joy() +
+  labs(title = "Density plot of musical happiness for Olivia Rodrigo's albums",
+       subtitle = "Musical happiness measured by valence pulled through Spotify's API",
+       x = "Musical Positivity",
+       y = "Album Name") +
+  theme(legend.position = "none")
+
+ggplot(sza_valence, aes(x= valence, y = album_name, fill = album_name, show.legend = F)) +
+  geom_joy() +
+  theme_joy() +
+  labs(title = "Density plot of musical happiness for SZA's albums",
+       subtitle = "Musical happiness measured by valence pulled through Spotify's API",
+       x = "Musical Positivity",
+       y = "Album Name") +
+  theme(legend.position = "none")
+```
+
+I've created two graphs of two hugely popular artists and measured the positivity in their music (instrumentally). It seems that both artists have variance between their albums, which implies personal growth and development in their styles. Olivia's music also generally seems happier than SZA's music. It is interesting how both Olivia's albums are bimodal and SZA's Z album is also that, while the other two SZA albums are nearly a normal distribution in terms of happiness across songs in the album.
 
 
 ## Problem 3: Scraping Reedie Data
@@ -116,14 +224,35 @@ Let's see what lovely data we can pull from Reed's own website.
 
 a. Go to [https://www.reed.edu/ir/success.html](https://www.reed.edu/ir/success.html) and scrape the two tables.
 
+```{r, message = FALSE}
+html_table(read_html("https://www.reed.edu/ir/success.html"))
+```
 
 
 
 b. Grab and print out the table that is entitled "GRADUATE SCHOOLS MOST FREQUENTLY ATTENDED BY REED ALUMNI".  Why is this data frame not in a tidy format?
 
+This data does not seem in a tidy format at all. An example of this would be that rows are not observations in this format. We also notice that columns are not necessarily variables? (or at least not in a tidy way). 
+
+```{r}
+alumni_school <- data.frame(html_table(read_html("https://www.reed.edu/ir/success.html"))[2])
+alumni_school
+```
+
 
 
 c. Wrangle the data into a tidy format. Glimpse the resulting data frame.
+
+```{r, message = FALSE}
+temp <- alumni_school %>% gather(key = "variable", value = "value")
+tidy_alumni_school <- data.frame(school = unique(temp$value))
+tidy_alumni_school %>% mutate(MBA = ifelse(school %in% alumni_school$MBAs, "Yes", "No"), 
+                              JD = ifelse(school %in% alumni_school$JDs, "Yes", "No"),
+                              PhD = ifelse(school %in% alumni_school$PhDs, "Yes", "No"),
+                              MD = ifelse(school %in% alumni_school$MDs, "Yes", "No"))
+rm(temp)
+glimpse(tidy_alumni_school)
+```
 
 
 
@@ -131,9 +260,22 @@ d. Now grab the "OCCUPATIONAL DISTRIBUTION OF ALUMNI" table and turn it into an 
 
 ```{r}
 # Hint: Use `parse_number()` within `mutate()` to fix one of the columns
+alumni_occupation <- data.frame(html_table(read_html("https://www.reed.edu/ir/success.html"))[1])
+alumni_occupation <- alumni_occupation %>% mutate(percent = parse_number(alumni_occupation$X2)) %>% select(X1, percent)
 ```
 
+```{r}
+ggplot(data = alumni_occupation, mapping = aes(x = X1, y = percent, fill = X1)) +
+  geom_col() +
+  labs(x = "Alumni Occupations",
+       y = "Percent of Alumni",
+       title = "Distribution of Reed College's alumni occupations",
+       subtitle = "Data sourced from Reed College 2014 Alumni Database") +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 45, hjust = 1))
+```
 
+We can draw pretty good conclusions from this graph. It seems like a noticeably high majority of Reedies work in Business & Industry or Education or are self-employed. Almost every other field is under 5%, which tells us that there is also a noticeable portion of Reedies in various fields, but it is most likely going to be difficult to connect with others there due to the small percentage.
 
 
 
@@ -141,18 +283,25 @@ e. Let's now grab the Reed graduation rates over time.  Grab the data from [here
 
 Do the following to clean up the data:
 
+```{r}
+reed_grad <- data.frame(html_table(read_html("https://www.reed.edu/ir/gradrateshist.html"))[1])
+```
+
 * Rename the column names.  
 
-```{r,eval = FALSE}
+```{r}
 # Hint
-colnames(___) <- c("name 1", "name 2", ...)
+colnames(reed_grad) <- c("enter_year", "cohort_count", "grad_4yr", "grad_5yr", "grad_6yr")
 ```
 
 * Remove any extraneous rows.
 
-```{r, eval = FALSE}
+```{r}
 # Hint
-filter(row_number() ...)
+reed_grad <- reed_grad %>% slice(2:39)
+reed_grad$grad_4yr <- parse_number(reed_grad$grad_4yr, na = c("", "NA"))
+reed_grad$grad_5yr <- parse_number(reed_grad$grad_5yr, na = c("", "NA"))
+reed_grad$grad_6yr <- parse_number(reed_grad$grad_6yr, na = c("", "NA"))
 ```
 
 * Reshape the data so that there are columns for 
@@ -160,8 +309,31 @@ filter(row_number() ...)
     + Cohort size
     + Years to graduation
     + Graduation rate
+    
+```{r}
+reed_grad <- reed_grad %>% gather(years_to_grad, grad_rate, starts_with("grad_")) %>%
+  mutate(years_to_grad = as.character(parse_number(years_to_grad)), 
+         cohort_count = as.numeric(cohort_count), 
+         enter_year = as.numeric(enter_year))
 
-* Make sure each column has the correct class.    
+reed_grad <- reed_grad[complete.cases(reed_grad),]
+```
 
+
+* Make sure each column has the correct class.   
+
+They do in this case for the purpose of the analysis in the following graph.
 
 f. Create a graph comparing the graduation rates over time and draw some conclusions.
+
+```{r}
+ggplot(data = reed_grad, mapping = aes(x = enter_year, y = grad_rate, color = years_to_grad)) +
+  geom_line() +
+  labs(x = "Student's First Year",
+       y = "Graduation Rate",
+       color = "Years to Graduate",
+       title = "How long does it take Reedies to graduate?",
+       subtitle = "Data collected from Reed's Institutional Research")
+```
+
+It seems like there generally is always a huge similarity between the ones who graduate in 5 years and in 6 years. It also is interesting how the ones who graduate in 4 years always have a gap between the other 2 regardless of what year it was. The overall graduation rate seems incredibly low, which is not surprising knowing how Reed likes to set its academic support and rigor, but also is very indicative of the college as an education. There seems to be a glaring issue with graduation rates, and it seems like there was work that was done to improve this over time.

@@ -140,7 +140,7 @@ covid_survey_summary_stats$explanatory[covid_survey_summary_stats$explanatory ==
 ggplot(data = covid_survey_summary_stats, mapping = aes(mean, explanatory_value, xmin = low, xmax = high)) +
   geom_errorbarh(height = 0.1) +
   geom_point() +
-  facet_grid(vars(factor(explanatory, levels = c("All", "Age", "Gender", "Race", "Ethnicity", "Profession", "Had COVID Vaccine", "Had flu vaccine this year"))), vars(response), scales = "free_y", labeller = labeller(response = label_wrap_gen(15))) +
+  facet_grid(vars(factor(explanatory, levels = c("All", "Age", "Gender", "Race", "Ethnicity", "Profession", "Had COVID Vaccine", "Had flu vaccine this year"))), vars(response), space = "free", scales = "free_y", labeller = labeller(response = label_wrap_gen(15))) +
   theme_minimal() + 
   theme(strip.background = element_rect(colour="black",
                                         fill="gray90"),
