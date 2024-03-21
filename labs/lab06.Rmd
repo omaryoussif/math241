@@ -1,6 +1,6 @@
 ---
 title: "Lab 6"
-author: "Insert Name"
+author: "Omar Youssif"
 date: "Math 241, Week 8"
 output:
   pdf_document
@@ -33,7 +33,22 @@ For this problem we will return to the biketown dataset.
 
 a. Grab the code from activity 9, Problem 1 to read the data directly from Biketown's API- make sure to keep the longitude and latitude of the start of each ride (`StartLatitude`, `StartLongitude`).
 
+```{r}
+biketown_data <- bind_rows(readr::read_csv("https://s3.amazonaws.com/biketown-tripdata-public/2017_01.csv"),
+                           readr::read_csv("https://s3.amazonaws.com/biketown-tripdata-public/2017_07.csv"),
+                           readr::read_csv("https://s3.amazonaws.com/biketown-tripdata-public/2017_11.csv")) %>%
+  
+  select(StartDate, StartTime, StartLatitude, StartLongitude, EndDate, EndTime, Distance_Miles,
+         BikeID)
+```
+
+
 b. Create an interactive map of the start point of the rides using the `leaflet` package.  Make sure to include a legend and a title.  What do you notice about the distribution of rides?
+
+```{r}
+
+```
+
 
 c. Using the `lubridate` package, create a variable, `month`, indicating the month of each variable.
 

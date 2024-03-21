@@ -26,13 +26,26 @@ a. Find all of the adjectives in Macbeth that end in more or less
 ```{r}
 data(Macbeth_raw)
 
+macbeth <- Macbeth_raw %>%
+  str_split(" ") %>%
+  pluck(1)
+
+macbethMoreLess <- macbeth %>%
+  str_subset("[a-z](more|less)$")
 ```
 
 
 b. Find all of the lines containing the stage direction Exit or Exeunt.
 
 ```{r}
+data(Macbeth_raw)
 
+macbeth2 <- Macbeth_raw %>%
+  str_split("\r\n") %>%
+  pluck(1)
+
+macbethExit <- macbeth2 %>%
+  str_subset("(Exit|Exeunt)")
 ```
 
 ## Problem 2 (Medium): 
@@ -41,13 +54,13 @@ a. Use regular expressions to determine the number of speaking lines in the Comp
 speak.
 
 ```{r, eval = FALSE}
-shakespeare_url <- "http://www.gutenberg.org/files/100/100-0.txt"
-shakespeare <- RCurl::getURL(shakespeare_url) %>%
-  
+shakespeare_url <- "https://www.gutenberg.org/files/100/100-0.txt"
+shakespeare <- RCurl::getURL(shakespeare_url)
+view(shakespeare)
 ```
 
 ```{r}
-
+shakespeare_chars <- tribble(~name, ~regexp, "")
 ```
 
 b. Make a bar chart displaying the top 100 characters with the greatest number of lines. Hint you may want to use either the `stringr::str_extract` or `strsplit` function here.
