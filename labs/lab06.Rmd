@@ -3,7 +3,9 @@ title: "Lab 6"
 author: "Omar Youssif"
 date: "Math 241, Week 8"
 output:
-  pdf_document
+  pdf_document: default
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
@@ -16,6 +18,7 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 library(tidyverse)
 library(leaflet)
 library(tidycensus)
+library(tmap)
 ```
 
 
@@ -45,30 +48,97 @@ biketown_data <- bind_rows(readr::read_csv("https://s3.amazonaws.com/biketown-tr
 
 b. Create an interactive map of the start point of the rides using the `leaflet` package.  Make sure to include a legend and a title.  What do you notice about the distribution of rides?
 ```{r}
+col <- colorBin("PuOr", biketown_data$Distance_Miles, bins = c(0, 1, 2.5, 5, 10, 20))
+
 biketown_data %>% 
   leaflet() %>%
   addTiles() %>%
-  addCircleMarkers(lng = ~StartLongitude, lat = ~StartLatitude)
+  addCircleMarkers(lng = ~StartLongitude, lat = ~StartLatitude, color = ~col(biketown_data$Distance_Miles)) %>%
+  addLegend(pal = col, values = ~biketown_data$Distance_Miles, group = "circles", title = "Travelled Distance (mi)")
 ```
 
-
-```{r}
-
-```
-
+I notice that a lot of the rides are centered around the middle of Portland and are typically short rides (implying to me that it might not be for commuting?). This also tells me that distances are typically pretty short.
 
 c. Using the `lubridate` package, create a variable, `month`, indicating the month of each variable.
 
+```{r}
+biketown_data <- biketown_data %>% mutate(month = month(mdy(StartDate), label = TRUE))
+```
+
 Add this variable to your interactive map using color.  Make sure to include a legend and be mindful of your color palette choice.  Do ride locations vary by months of the year?
+
+```{r}
+col2 <- colorFactor("Blues", biketown_data$month)
+
+biketown_data %>% 
+  leaflet() %>%
+  addTiles() %>%
+  addCircleMarkers(lng = ~StartLongitude, lat = ~StartLatitude, color = ~col2(biketown_data$month)) %>%
+  addLegend(pal = col2, values = ~biketown_data$month, group = "circles", title = "Month of Ride")
+```
+
+It seems like in the summer there are more rides, which makes more sense becuase the weather wouldn't be a hurdle when riding unlike in Jan/November.
 
 ### Problem 2: Choropleth Maps
 
 For this problem, I want you to practice creating choropleth maps.  Let's grab some data using `tidycensus`.  Remember that you will have to set up an [API key](https://api.census.gov/data/key_signup.html).
 
-```{r, eval = FALSE}
-api_key <- "insert key"
-```
-
 a. Let's grab data on the median gross rent (`B25064_001`) from the American Community Survey for Multnomah county, Oregon.  I want you to do data pulls at three geography resolutions: county subdivision, tract, and block group.
 
-b. Create three choropleth maps of gross rent, one for each geography resolution.  What information can we glean from these maps?  Also, which resolution seems most useful for this variable?  Justify your answer.
+```{r}
+or_tracts <- get_acs(geography = "tract",
+                     year = 2022,
+                     variables = c(medrent = "B25064_001"),
+                     state = "OR",
+                     county = "Multnomah",
+                     survey = "acs5",
+                     output = "wide",
+                     geometry = TRUE)
+
+or_county <- get_acs(geography = "county subdivision",
+                     year = 2022,
+                     variables = c(medrent = "B25064_001"),
+                     state = "OR",
+                     county = "Multnomah",
+                     survey = "acs5",
+                     output = "wide",
+                     geometry = TRUE)
+
+or_block <- get_acs(geography = "block group",
+                     year = 2022,
+                     variables = c(medrent = "B25064_001"),
+                     state = "OR",
+                     county = "Multnomah",
+                     survey = "acs5",
+                     output = "wide",
+                     geometry = TRUE)
+```
+
+
+b. Create three choropleth maps of gross rent, one for each geography resolution.  What information can we glean from these maps?  Also, which resolution seems most useful for this variable?  Justify your answer
+
+```{r}
+tm_shape(or_tracts) +
+  tm_polygons(col = "medrentE", style = "quantile", palette = "BuGn", title = "Median Gross Rent") +
+  tm_layout(main.title = "Median Gross Rent in Multnomah County by Tracts, 2018-2022",
+            main.title.position = "center",
+            legend.outside = TRUE)
+```
+
+```{r}
+tm_shape(or_county) +
+  tm_polygons(col = "medrentE", style = "quantile", palette = "BuGn", title = "Median Gross Rent") +
+  tm_layout(main.title = "Median Gross Rent in Multnomah County by County Subdivisons, 2018-2022",
+            main.title.position = "center",
+            legend.outside = TRUE)
+```
+
+```{r}
+tm_shape(or_block) +
+  tm_polygons(col = "medrentE", style = "quantile", palette = "BuGn", title = "Median Gross Rent") +
+  tm_layout(main.title = "Median Gross Rent in Multnomah County by Block Groups, 2018-2022",
+            main.title.position = "center",
+            legend.outside = TRUE)
+```
+
+It seems that tracts are the most useful as they provide the best compromise with cleanliness and also giving us useful information. We can glean that West Portland tends to be. alittle pricier, and generally rent varies a lot and you can observe some geographical trends. It's useful to compare by block groups and tracts to identify trends, but if I were to want a singular one, I'd choose tracts still. East Portland (not very east) seems to have the lowest rent.

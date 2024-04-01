@@ -40,7 +40,7 @@ Freedom House has analyzed challenges to freedom and advocated for greater polit
 #| warning: false
 #| out-width: "80%"
 
-freedom <- read_csv(here::here("freedom.csv"), na = "-")
+freedom <- read_csv(here::here("Github/math241/activities/freedom.csv"), na = "-")
 
 freedom_ranked <- freedom %>%
   select(country, contains("cl_")) %>%
@@ -59,15 +59,23 @@ freedom_ranked <- freedom %>%
 
 # Your first interactive visualization!
 
--   **Demo:**: create a simple static line plots of your country of choice civl liberty score over time
+-   **Demo:**: create a simple static line plots of your country of choice civil liberty score over time
 
 ```{r}
 #| label: simple-line-plot
 #| eval: false
 
 freedom_ranked %>%
-  filter() %>% 
-  ggplot()
+  filter(country == "Egypt") %>% 
+  ggplot(mapping = aes(x = year, y = rank_in_year, color = civil_liberty)) +
+  geom_point() +
+  geom_line() +
+  labs(title = "Freedom House's Civil Liberty Analysis of Egypt",
+       subtitle = "Data sourced from the Freedom House and ranges from 1990-2022",
+       y = "Civil Liberty Country Rank", 
+       x = "Year",
+       color = "Civil Liberty Score") +
+  transition_reveal(year)
 
 ```
 
@@ -95,7 +103,7 @@ freedom_to_plot <- freedom %>%
   filter(country %in% countries_to_plot) %>%
   drop_na()
 
-freedom_ranked <- freedom %>%
+freedom_ranked <- freedom_to_plot %>%
   select(country, contains("cl_")) %>%
   pivot_longer(
     cols = -country,
@@ -118,6 +126,17 @@ freedom_ranked <- freedom %>%
 
 # add code here
 
+freedom_ranked %>%
+  filter(year %in% c(1990, 2000, 2010)) %>% 
+  ggplot(mapping = aes(x = rank_in_year, y = country)) +
+  facet_wrap( ~ year) +
+  geom_col(position = "stack") +
+  labs(title = "Freedom House's Civil Liberty Analysis",
+       subtitle = "Data sourced from the Freedom House and for 1990, 2000, and 2010",
+       y = "Country", 
+       x = "Rank",
+       color = "")
+
 # hint: to label each bar with country name, you can use 
 
 geom_text(
@@ -138,8 +157,18 @@ geom_text(
 
 # hint: make sure all the years are included this time
 
-
 # add code here
+
+freedom_ranked %>%
+  ggplot(mapping = aes(x = rank_in_year, y = country)) +
+  geom_col(position = "stack") +
+  labs(title = "Freedom House's Civil Liberty Analysis",
+       subtitle = year,
+       y = "Country", 
+       x = "Rank",
+       color = "") +
+  transition_states(year, state_length = 10)
+
 
 # hint: label each year with   
 
