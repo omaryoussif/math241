@@ -1,6 +1,6 @@
 ---
 title: "Lab 7"
-author: "Insert Name"
+author: "Omar Youssif"
 date: "Math 241, Week 9"
 output:
   pdf_document
@@ -18,7 +18,9 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 # Put all necessary libraries here
 library(tidyverse)
 library(tidytext)
-
+library(stringr)
+library(wordcloud)
+library(RColorBrewer)
 # Ensure the textdata package is installed
 if (!requireNamespace("textdata", quietly = TRUE)) {
   install.packages("textdata")
@@ -56,9 +58,13 @@ data("babynames")
 
 a. For 2000, find the ten most popular female baby names that start with the letter Z.
 
-```{r, eval = FALSE}
-#Hint: Use 
-top_n(___)
+```{r}
+Fbaby2000 <- babynames %>% filter(year == 2000, sex == "F")
+dfa <- top_n(Fbaby2000 %>% filter(Fbaby2000$name %in% str_subset(Fbaby2000$name, "^Z")), 
+      n = 10, 
+      wt = n)
+dfa$dataset <- "dfa"
+dfa
 ```
 
 
@@ -66,20 +72,46 @@ top_n(___)
 
 b. For 2000, find the ten most popular female baby names that contain the letter z.  
 
+```{r}
+dfb <- top_n(Fbaby2000 %>% filter(Fbaby2000$name %in% str_subset(Fbaby2000$name, "z")), 
+      n = 10, 
+      wt = n)
+dfb$dataset <- "dfb"
+dfb
+```
 
 
 c. For 2000, find the ten most popular female baby names that end in the letter z. 
 
+```{r}
+dfc <- top_n(Fbaby2000 %>% filter(Fbaby2000$name %in% str_subset(Fbaby2000$name, "z$")), 
+      n = 10, 
+      wt = n)
+dfc$dataset <- "dfc"
+dfc
+```
+
 
 d. Between your three tables in 1.a - 1.c, do any of the names show up on more than one list?  If so, which ones? (Yes, I know you could do this visually but use some joins!)
 
+Nope, we can also check this through inner joining all of them and doing all possible inner joins to catch all intersects, and we can see in the dataset "dfd" that we have 0 overlaps between all of them as it is empty.
 
+```{r}
+dfd1 <- inner_join(dfa, dfb, by = "name")
+dfd2 <- inner_join(dfa, dfc, by = "name")
+dfd3 <- inner_join(dfb, dfc, by = "name")
 
-
-
+dfd <- full_join(dfd1, dfd2, dfd3, by = "name")
+dfd
+```
 
 e.  Verify that none of the baby names contain a numeric (0-9) in them.
 
+This returns an empty set, so we know that none of the names have a numeric in them.
+
+```{r}
+babynames %>% filter(babynames$name %in% str_subset(babynames$name, "[0-9]"))
+```
 
 
 f. While none of the names contain 0-9, that doesn't mean they don't contain "one", "two", ..., or "nine".  Create a table that provides the number of times a baby's name contained the word "zero", the word "one", ... the word "nine". 
@@ -94,17 +126,54 @@ Notes:
     1. Subset your table to only include the rows with the desired words.
     2. Add a column that contains the desired word.  
 
+```{r}
+lower_baby <- babynames
+lower_baby$name <- lower_baby$name %>% str_replace_all(pattern = c("A" = "a", "B" = "b", "C" = "c", "D" = "d", "E" = "e", "F" = "f", "G" = "g", "H" = "h", "I" = "i", "J" = "j", "K" = "k", "L" = "l", "M" = "m", "N" = "n", "O" = "o", "P" = "p", "Q" = "q", "R" = "r", "S" = "s", "T" = "t", "U" = "u", "V" = "v", "W" = "w", "X" = "x", "Y" = "y", "Z" = "z"))
+```
+
+```{r}
+num_baby <- lower_baby %>% filter(lower_baby$name %in% str_subset(lower_baby$name, "one|two|three|four|five|six|seven|eight|nine"))
+
+dfd <- data.frame(
+one = sum(str_detect(num_baby$name, pattern = "one")),
+two = sum(str_detect(num_baby$name, pattern = "two")),
+three = sum(str_detect(num_baby$name, pattern = "three")),
+four = sum(str_detect(num_baby$name, pattern = "four")),
+five = sum(str_detect(num_baby$name, pattern = "five")),
+six = sum(str_detect(num_baby$name, pattern = "six")),
+seven = sum(str_detect(num_baby$name, pattern = "seven")),
+eight = sum(str_detect(num_baby$name, pattern = "eight")),
+nine = sum(str_detect(num_baby$name, pattern = "nine"))
+)
+
+print(dfd)
+```
+
 
 g. Which written number or numbers don't show up in any of the baby names?
 
 
+The written number "five" does not show up at all with "four" being very close to zero in terms of count too.
 
 
 h. Create a table that contains the names and their frequencies for the two least common written numbers.
 
+```{r}
+num_baby %>% filter(str_detect(num_baby$name, pattern = "four"))
+```
+```{r}
+num_baby %>% filter(str_detect(num_baby$name, pattern = "seven"))
+```
 
-i. List out the names that contain no vowels (consider "y" to be a vowel).  
 
+
+i. List out the names that contain no vowels (consider "y" to be a vowel).
+
+```{r}
+lower_baby %>% filter(str_detect(lower_baby$name, pattern = "^[^aeiouy]+$"))
+```
+
+(I'm not sure what dataset to use here, the question is a little unclear to me. Can't tell whether all baby names or the written number one. I checked and the written number one yields 0 names).
 
 ### Problem 2: Tidying the "Call of the Wild"
 
@@ -117,12 +186,37 @@ wild <- gutenberg_download(215)
 
 a.  Create a tidy text dataset where you tokenize by words.
 
+```{r}
+p2dfa <- wild %>% unnest_tokens(output = word, input = text) %>% select(-gutenberg_id)
+```
 
 
 b. Find the frequency of the 20 most common words.  First, remove stop words.
 
+```{r}
+p2dfa %>%
+  anti_join(stop_words) %>%
+  count(word, sort = TRUE) %>%
+  filter(n > 39) %>%
+  ggplot(aes(y = fct_reorder(word, n), x = n, fill = n)) +
+  geom_col() +
+  guides(fill = FALSE)
+
+
+p2df <- p2dfa %>% anti_join(stop_words) %>% count(word, sort = TRUE) %>% filter(n > 39)
+```
+
 
 c. Create a bar graph and a word cloud of the frequencies of the 20 most common words.
+
+```{r}
+pal <- brewer.pal(9, "Set1")
+
+wordcloud(p2df$word, 
+          scale = c(3, 1),
+          rot.per = .5, colors = pal,
+          min.freq = 0, random.order = FALSE)
+```
 
 
 d. Explore the sentiment of the text using three of the sentiment lexicons in `tidytext`. What does your analysis say about the sentiment of the text?
@@ -132,16 +226,89 @@ Notes:
 * Make sure to NOT remove stop words this time.  
 * `afinn` is a numeric score and should be handled differently than the categorical scores.
 
+```{r}
+p2dfa %>% 
+  inner_join(get_sentiments("bing"), by = "word") %>%
+  count(sentiment, word, sort = TRUE) %>%
+  group_by(sentiment) %>%
+  slice_head(n = 20) %>%
+  ggplot(aes(y = fct_reorder(word, n), x = n, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~sentiment, scales = "free") +
+  labs(
+    title = "Sentiment and frequency of words in Call of the Wild by Jack London?",
+    subtitle = "Bing lexicon",
+    y = NULL, x = NULL
+  ) +
+  scale_fill_manual(values = c("tomato", "lightblue"))
+
+p2dfa %>% 
+inner_join(get_sentiments("nrc"), by = "word") %>%
+  mutate(
+    sentiment = fct_relevel(
+      sentiment, "positive", "anticipation", "joy", "surprise", "trust",
+      "negative", "anger", "disgust", "fear", "sadness"
+    ),
+    sentiment_binary = if_else(sentiment %in% c("positive", "anticipation", "joy", "surprise", "trust"), "positive", "negative")
+  ) %>%
+  count(sentiment_binary, sentiment, word, sort = TRUE) %>%
+  group_by(sentiment) %>%
+  slice_head(n = 10) %>%
+  ggplot(aes(y = fct_reorder(word, n), x = n, fill = sentiment_binary)) +
+  geom_col() +
+  guides(fill = FALSE) +
+  facet_wrap(~sentiment, scales = "free_y", ncol = 5) +
+  labs(
+    title = "Sentiment and frequency of words in Call of the Wild by Jack London?",
+    subtitle = "NRC lexicon",
+    y = NULL, x = NULL
+  ) +
+  scale_x_continuous(breaks = c(0, 200)) +
+  theme_minimal(base_size = 11) +
+  scale_fill_manual(values = c("tomato", "lightblue"))
+
+p2dfe <- p2dfa %>% inner_join(get_sentiments("afinn")) %>% 
+  group_by(word) %>% 
+  summarise(sentiment = sum(value))
+
+ggplot(data = p2dfe, mapping = aes(x = sentiment)) +
+    geom_bar() +
+  labs(
+    title = "Sentiment and frequency of words in Call of the Wild by Jack London?",
+    subtitle = "AFINN lexicon")
+```
+The text seems to lean a little more towards the negative side, particularly when looking at the positive words and some possibly being connector words, not actual positive words.
 
 
 e. If you didn't do so in 2.d, compute the average sentiment score of the text using `afinn`.  Which positive words had the biggest impact? Which negative words had the biggest impact?
 
+```{r}
+p2dfe %>% summarize(avg = mean(sentiment))
+p2dfe %>%  arrange(desc(sentiment)) %>% slice_head(n = 5)
+p2dfe %>%  arrange(sentiment) %>% slice_head(n = 5)
+```
+
+Positive: great, like, good, love, strength
+Negative: no, dead, fire, cried, lost
 
 
-f. You should have found that "no" was an important negative word in the sentiment score.  To know if that really makes sense, let's turn to the raw lines of text for context.  Pull out all of the lines that have the word "no" in them.  Make sure to not pull out extraneous lines (e.g., a line with the word "now").  
+f. You should have found that "no" was an important negative word in the sentiment score.  To know if that really makes sense, let's turn to the raw lines of text for context. Pull out all of the lines that have the word "no" in them.  Make sure to not pull out extraneous lines (e.g., a line with the word "now").  
+
+```{r}
+dff <- wild %>% 
+  unnest_tokens(output = words, input = text, token = "lines") %>% 
+  select(-gutenberg_id) %>% 
+  mutate(id = row_number())
+
+dff %>% group_by(id) %>% 
+  filter(str_count(words, "\\s") > 1) %>% 
+  filter(str_detect(words, "\\bno\\b"))
+```
 
 
 g. Draw some conclusions about how "no" is used in the text.
+
+It seems to be used mostly as a synonym of "regardless of" but always in a negative connotation, so I see why the lexicons thought it's a very negative word. Though this is a overgenerlization and there are some cases where that's not the case, but it can't separate them, so it's incredibly boosted.
 
 
 h. We can also look at how the sentiment of the text changes as the text progresses.  Below, I have added two columns to the original dataset. Now I want you to do the following wrangling:
@@ -158,9 +325,23 @@ wild_time <- wild %>%
   mutate(line = row_number(), index = floor(line/45) + 1) 
 ```
 
-```{r, eval = FALSE}
-#Hint: fill = 0 will insert zero instead of NA
-pivot_XXX(..., values_fill = 0)
+```{r}
+dfh1 <- wild_time %>% 
+  unnest_tokens(output = word, input = text) %>% 
+  select(-gutenberg_id) %>% 
+  inner_join(get_sentiments("bing"), by = "word") %>%
+  count(sentiment, index, sort = TRUE)
+
+dfh2 <- wild_time %>% 
+  unnest_tokens(output = word, input = text) %>% 
+  select(-gutenberg_id) %>% 
+  inner_join(get_sentiments("bing"), by = "word") %>%
+  count(sentiment, index, sort = TRUE) %>%
+  pivot_wider(names_from = sentiment, values_from = n) %>%
+  mutate(vibe = positive - negative)
+
+dfh1
+dfh2
 ```
 
 
@@ -169,15 +350,56 @@ pivot_XXX(..., values_fill = 0)
 i. Create a plot of the sentiment scores as the text progresses.
 
 
+```{r}
+ggplot(data = dfh2, mapping = aes(x = index, y = vibe)) +
+  geom_line()
+```
+
 
 
 j. The choice of 45 lines per chunk was pretty arbitrary.  Try modifying the index value a few times and recreating the plot in i.  Based on your plots, what can you conclude about the sentiment of the novel as it progresses?
 
+```{r}
+wild_time2 <- wild %>%
+  mutate(line = row_number(), index = floor(line/15) + 1)
+
+dfj <- wild_time2 %>% 
+  unnest_tokens(output = word, input = text) %>% 
+  select(-gutenberg_id) %>% 
+  inner_join(get_sentiments("bing"), by = "word") %>%
+  count(sentiment, index, sort = TRUE) %>%
+  pivot_wider(names_from = sentiment, values_from = n) %>%
+  mutate(vibe = positive - negative)
+
+ggplot(data = dfj, mapping = aes(x = index, y = vibe)) +
+  geom_line()
+
+```
+
+It seems generally stagnant (trend-wise) though. it doesn't look as extremely negative as the other line makes it out to be. Though it seems like it goes up and down significantly in short periods of times, which makes a large index division lean negative.
+
 
 k. Let's look at the bigrams (2 consecutive words).  Tokenize the text by bigrams.  
 
+```{r}
+dfk <- wild %>% 
+  unnest_tokens(output = bigrams, input = text, token = "ngrams", n = 2) %>% 
+  select(-gutenberg_id) %>% 
+  mutate(id = row_number()) %>% 
+  drop_na()
+
+dfk
+```
 
 
 l.  Produce a sorted table that counts the frequency of each bigram and notice that stop words are still an issue.
 
+```{r}
+dfk %>%
+  unnest_tokens(word, bigrams, drop = FALSE) %>%
+  anti_join(stop_words) %>% 
+  group_by(bigrams) %>% 
+  summarize(n = n()) %>% 
+  arrange(desc(n))
+```
 
