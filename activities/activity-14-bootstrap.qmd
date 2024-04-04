@@ -1,4 +1,6 @@
 ---
+
+---
 title: "Quantifying uncertainty"
 editor: visual
 ---
@@ -47,6 +49,8 @@ Use these data and the tools we've learned in this class to come up with your be
 #| label: take-a-guess
 
 # add code here
+abb %>% rep_sample_n(size = nrow(abb), replace = TRUE, reps = 1000) %>%
+  summarize(m = mean(ppg, na.rm=T)) %>% summarize(avg = mean(m), std_err_ppg = sd(m))
 ```
 
 Do you think your guess is correct?
